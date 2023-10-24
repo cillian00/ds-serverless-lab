@@ -59,6 +59,7 @@ export class RestAPIStack extends cdk.Stack {
         environment: {
           TABLE_NAME: moviesTable.tableName,
           REGION: 'eu-west-1',
+            CAST: ''
         },
       }
       );
