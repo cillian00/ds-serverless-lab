@@ -24,3 +24,16 @@ export type MovieCastMemberQueryParams = {
     actorName?: string;
     roleName?: string
 }
+
+export type MovieReviews = {
+    movieId: number;
+    reviewerName?: string;
+    reviewDate?: string;
+    rating?: number;
+    content?: string
+}
+
+export type MovieReviewsQueryParams = {
+    reviewerName?: string;
+    reviewDate?: string;
+}
