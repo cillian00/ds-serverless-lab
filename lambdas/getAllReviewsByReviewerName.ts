@@ -1,52 +1,42 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {DeleteCommand, DynamoDBDocumentClient, GetCommand, PutCommand} from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
-const ddbDocClient = createDDbDocClient();
+const ddbDocClient = createDocumentClient();
 
-export const handler: APIGatewayProxyHandlerV2 = async (event, context) => { // Note change
+export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     try {
         console.log("Event: ", event);
-        const parameters  = event?.pathParameters;
-        const movieId = parameters?.movieId ? parseInt(parameters.movieId) : undefined;
 
-        if (!movieId) {
+        const { reviewerName } = event.pathParameters || {};
+        if (!reviewerName) {
             return {
-                statusCode: 404,
+                statusCode: 400,
                 headers: {
                     "content-type": "application/json",
                 },
-                body: JSON.stringify({ Message: "Missing movie Id" }),
+                body: JSON.stringify({ message: "Missing path parameters" }),
             };
         }
 
         const commandOutput = await ddbDocClient.send(
-            new DeleteCommand({
+            new ScanCommand({
                 TableName: process.env.TABLE_NAME,
-                Key: { movieId: movieId },
+                FilterExpression: "begins_with(reviewerName, :a)",
+                ExpressionAttributeValues: {
+                    ":a": reviewerName,
+                },
             })
         );
-        console.log("GetCommand response: ", commandOutput);
-        if (!commandOutput) {
-            return {
-                statusCode: 404,
-                headers: {
-                    "content-type": "application/json",
-                },
-                body: JSON.stringify({ Message: "Invalid movie Id" }),
-            };
-        }
-        const body = {
-            data: commandOutput,
-        };
 
-        // Return Response
         return {
             statusCode: 200,
             headers: {
                 "content-type": "application/json",
             },
-            body: JSON.stringify(body),
+            body: JSON.stringify({
+                data: commandOutput.Items,
+            }),
         };
     } catch (error: any) {
         console.log(JSON.stringify(error));
@@ -60,7 +50,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => { // 
     }
 };
 
-function createDDbDocClient() {
+function createDocumentClient() {
     const ddbClient = new DynamoDBClient({ region: process.env.REGION });
     const marshallOptions = {
         convertEmptyValues: true,

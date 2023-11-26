@@ -7,6 +7,7 @@ import {
     QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
 import Ajv from "ajv";
+// @ts-ignore
 import schema from "../shared/types.schema.json";
 
 const ajv = new Ajv();
@@ -19,7 +20,7 @@ const ddbDocClient = createDocumentClient();
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     try {
         console.log("Event: ", event);
-        const queryParams = event.queryStringParameters;
+        const queryParams = event.queryStringParameters || {};
         if (!queryParams) {
             return {
                 statusCode: 500,
@@ -43,6 +44,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
         }
 
         // const parameters = event.queryStringParameters;
+        // @ts-ignore
         const movieId = parseInt(queryParams.movieId);
         let commandInput: QueryCommandInput = {
             TableName: process.env.TABLE_NAME,

@@ -1,62 +1,43 @@
 import { APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import {
-    DynamoDBDocumentClient,
-    QueryCommand,
-    QueryCommandInput,
-} from "@aws-sdk/lib-dynamodb";
-import Ajv from "ajv";
-import schema from "../shared/types.schema.json";
+import { DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
 
-const ajv = new Ajv();
-const isValidQueryParams = ajv.compile(
-    schema.definitions["MovieCastMemberQueryParams"] || {}
-);
-
-const ddbDocClient = createDocumentClient();
+const ddbDocClient = createDDbDocClient();
 
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     try {
         console.log("Event: ", event);
-        const queryParams = event.queryStringParameters || {};
-        const { movieId } = event.pathParameters || {};
 
-        if (!isValidQueryParams(queryParams)) {
+        const pathParameters = event?.pathParameters;
+        const movieId = pathParameters?.movieId ? parseInt(pathParameters.movieId) : undefined;
+
+        if (!movieId) {
             return {
-                statusCode: 400,
+                statusCode: 404,
                 headers: {
                     "content-type": "application/json",
                 },
-                body: JSON.stringify({
-                    message: `Incorrect type. Must match Query parameters schema`,
-                    schema: schema.definitions["MovieReviewsQueryParams"],
-                }),
+                body: JSON.stringify({ Message: "Invalid movie Id" }),
             };
         }
 
-        let commandInput: QueryCommandInput = {
+        const queryStringParameters = event?.queryStringParameters;
+        const minRating = queryStringParameters?.minRating;
+
+        const commandInput = {
             TableName: process.env.TABLE_NAME,
+            KeyConditionExpression: "movieId = :m",
+            ExpressionAttributeValues: {
+                ":m": movieId,
+            },
         };
 
-        if ("reviewerName" in queryParams) {
-            commandInput = {
-                ...commandInput,
-                KeyConditionExpression: "movieId = :m and begins_with(reviewerName, :a) ",
-                ExpressionAttributeValues: {
-                    ":m": movieId,
-                    ":a": queryParams.reviewerName,
-                },
-            };
-        } else {
-            commandInput = {
-                ...commandInput,
-                KeyConditionExpression: "movieId = :m",
-                ExpressionAttributeValues: {
-                    ":m": movieId,
-                },
-            };
+        if (minRating) {
+            // @ts-ignore
+            commandInput.FilterExpression = "rating > :minRating";
+            // @ts-ignore
+            commandInput.ExpressionAttributeValues[":minRating"] = Number(minRating);
         }
-
         const commandOutput = await ddbDocClient.send(
             new QueryCommand(commandInput)
         );
@@ -82,7 +63,7 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     }
 };
 
-function createDocumentClient() {
+function createDDbDocClient() {
     const ddbClient = new DynamoDBClient({ region: process.env.REGION });
     const marshallOptions = {
         convertEmptyValues: true,
